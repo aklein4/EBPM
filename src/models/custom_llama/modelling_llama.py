@@ -22,6 +22,8 @@ from typing import Callable, Optional, Union
 import torch
 from torch import nn
 
+import math
+
 from transformers.activations import ACT2FN
 from transformers.cache_utils import Cache, DynamicCache
 from transformers.generation import GenerationMixin
@@ -364,7 +366,7 @@ class CustomLlamaDecoderLayer(GradientCheckpointingLayer):
 
 
 @auto_docstring
-class LlamaPreTrainedModel(PreTrainedModel):
+class CustomLlamaPreTrainedModel(PreTrainedModel):
     config: LlamaConfig
     base_model_prefix = "model"
     supports_gradient_checkpointing = True
@@ -382,8 +384,25 @@ class LlamaPreTrainedModel(PreTrainedModel):
     }
 
 
+    gaussian_initialization = False
+    def _initialize_weights(self, module):
+        if not self.gaussian_initialization:
+            return super()._initialize_weights(module)
+
+        if isinstance(module, nn.Linear):
+            module.weight.data.normal_(
+                mean=0.0,
+                std=1.0/math.sqrt(module.in_features)
+            )
+            if module.bias is not None:
+                module.bias.data.zero_()
+        
+        if isinstance(module, nn.Embedding):
+            module.weight.data.normal_()
+
+
 @auto_docstring
-class CustomLlamaModel(LlamaPreTrainedModel):
+class CustomLlamaModel(CustomLlamaPreTrainedModel):
 
     layer_type = CustomLlamaDecoderLayer
 
@@ -483,7 +502,7 @@ class CustomLlamaModel(LlamaPreTrainedModel):
 
 
 @auto_docstring
-class CustomLlamaForCausalLM(LlamaPreTrainedModel, GenerationMixin):
+class CustomLlamaForCausalLM(CustomLlamaPreTrainedModel, GenerationMixin):
     _tied_weights_keys = ["lm_head.weight"]
     _tp_plan = {"lm_head": "colwise_rep"}
     _pp_plan = {"lm_head": (["hidden_states"], ["logits"])}
@@ -561,21 +580,21 @@ class CustomLlamaForCausalLM(LlamaPreTrainedModel, GenerationMixin):
         )
 
 
-class LlamaForSequenceClassification(GenericForSequenceClassification, LlamaPreTrainedModel): ...
+class CustomLlamaForSequenceClassification(GenericForSequenceClassification, CustomLlamaPreTrainedModel): ...
 
 
-class LlamaForQuestionAnswering(GenericForQuestionAnswering, LlamaPreTrainedModel):
+class CustomLlamaForQuestionAnswering(GenericForQuestionAnswering, CustomLlamaPreTrainedModel):
     base_model_prefix = "transformer"  # For BC, where `transformer` was used instead of `model`
 
 
-class LlamaForTokenClassification(GenericForTokenClassification, LlamaPreTrainedModel): ...
+class CustomLlamaForTokenClassification(GenericForTokenClassification, CustomLlamaPreTrainedModel): ...
 
 
 __all__ = [
-    "LlamaForCausalLM",
-    "LlamaModel",
-    "LlamaPreTrainedModel",
-    "LlamaForSequenceClassification",
-    "LlamaForQuestionAnswering",
-    "LlamaForTokenClassification",
+    "CustomLlamaForCausalLM",
+    "CustomLlamaModel",
+    "CustomLlamaPreTrainedModel",
+    "CustomLlamaForSequenceClassification",
+    "CustomLlamaForQuestionAnswering",
+    "CustomLlamaForTokenClassification",
 ]
