@@ -230,6 +230,7 @@ class LlamaAttention(nn.Module):
         attention_mask: Optional[torch.Tensor],
         past_key_values: Optional[Cache] = None,
         cache_position: Optional[torch.LongTensor] = None,
+        kv_states: Optional[tuple[torch.Tensor, torch.Tensor]] = None,
         **kwargs: Unpack[TransformersKwargs],
     ) -> tuple[torch.Tensor, torch.Tensor]:
         input_shape = hidden_states.shape[:-1]
@@ -251,6 +252,9 @@ class LlamaAttention(nn.Module):
         if self.config._attn_implementation != "eager":
             attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
 
+        if kv_states is not None:
+            key_states, value_states = kv_states[self.layer_idx]
+
         attn_output, attn_weights = attention_interface(
             self,
             query_states,
@@ -264,7 +268,7 @@ class LlamaAttention(nn.Module):
 
         attn_output = attn_output.reshape(*input_shape, -1).contiguous()
         attn_output = self.o_proj(attn_output)
-        return attn_output, attn_weights
+        return attn_output, attn_weights, (key_states, value_states)
 
 
 class CustomLlamaDecoderLayer(GradientCheckpointingLayer):
@@ -324,7 +328,7 @@ class CustomLlamaDecoderLayer(GradientCheckpointingLayer):
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
         # Self Attention
-        hidden_states, _ = self.self_attn(
+        hidden_states, _, kv_states = self.self_attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
             position_ids=position_ids,
