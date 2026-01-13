@@ -323,7 +323,7 @@ class CustomLlamaDecoderLayer(GradientCheckpointingLayer):
                 pre_kwargs[k] = locals()[k]
             else:
                 pre_kwargs[k] = None
-        hidden_states, results = self.pre_forward(hidden_states, **post_kwargs)
+        hidden_states, results = self.pre_forward(hidden_states, **pre_kwargs)
 
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
@@ -359,7 +359,11 @@ class CustomLlamaDecoderLayer(GradientCheckpointingLayer):
         hidden_states, post_results = self.post_forward(hidden_states, **post_kwargs)
         results.update(post_results)
 
-        return hidden_states, results
+        return (
+            hidden_states, 
+            list(results.keys()),
+            *list(results.values())
+        )
 
 
     def pre_forward(self, hidden_states):
@@ -440,6 +444,7 @@ class CustomLlamaModel(CustomLlamaPreTrainedModel):
         inputs_embeds: Optional[torch.FloatTensor] = None,
         cache_position: Optional[torch.LongTensor] = None,
         use_cache: Optional[bool] = None,
+        layer_slice: Optional[slice] = None,
         **kwargs: Unpack[TransformersKwargs],
     ) -> BaseModelOutputWithPast:
         if (input_ids is None) ^ (inputs_embeds is not None):
@@ -476,8 +481,8 @@ class CustomLlamaModel(CustomLlamaPreTrainedModel):
         kwarg_keys = list(kwargs.keys())
         kwarg_values = list(kwargs.values())
 
-        for decoder_layer in self.layers[: self.config.num_hidden_layers]:
-            hidden_states, results = decoder_layer(
+        for decoder_layer in (self.layers if layer_slice is None else self.layers[layer_slice]):
+            layer_out = decoder_layer(
                 hidden_states,
                 kwarg_keys,
                 *kwarg_values,
@@ -487,6 +492,11 @@ class CustomLlamaModel(CustomLlamaPreTrainedModel):
                 cache_position=cache_position,
                 position_embeddings=position_embeddings,
             )
+            hidden_states = layer_out[0]
+
+            result_keys = layer_out[1]
+            result_values = layer_out[2:]
+            results = {k: v for k, v in zip(result_keys, result_values)}
 
             all_results.append(results)
 
