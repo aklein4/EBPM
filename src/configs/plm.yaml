@@ -13,12 +13,12 @@ batch_size: 256
 
 model:
 
-    type: ebpm.modelling_plm.ProteinLM
+    type: plm.modelling_plm.ProteinLM
     pretrained: null
 
     config:
 
-        type: ebpm.configuration_plm.ProteinLMConfig
+        type: plm.configuration_plm.ProteinLMConfig
         
         kwargs:
 
