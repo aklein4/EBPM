@@ -159,7 +159,7 @@ class EBPMModel(CustomLlamaPreTrainedModel):
 
         # Initialize weights and apply final processing
         self.post_init()
-        self.ebm_head.weight.data.mul_(config.ebm_head_init_scale)
+        self.ebm_norm.weight.data.mul_(config.ebm_head_init_scale)
 
     
     def base_forward(

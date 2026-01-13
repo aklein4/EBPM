@@ -51,6 +51,8 @@ def main(config: omegaconf.DictConfig):
         )
         model = import_model(config.model.type)(model_config)
 
+    num_parameters = sum(p.numel() for p in model.parameters())
+    print(f"\nTraining model with {num_parameters} parameters.\n")
     model = model.to(constants.DEVICE, torch.float32)
     
     print("Loading dataset...")

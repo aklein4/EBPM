@@ -46,7 +46,7 @@ model:
             lora_rank: 256
             lora_init_scale: 0.1
 
-            ebm_head_init_scale: 0.1
+            ebm_head_init_scale: 0.01
 
             _attn_implementation: flash_attention_2
 
